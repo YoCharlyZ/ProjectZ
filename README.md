@@ -76,14 +76,13 @@ y luego verificarlas una vez mas "antes de energizar".
 
 > ___  
 > [!WARNING] :warning:  
->  - Solamente usted y nadie mas que usted es y sera siempre el/la responsable de sus acciones,  
-revise todo con cuidado y "leea" e informese bien antes que nada.  
+>  - Solamente usted y nadie mas que usted es y sera siempre el/la responsable de sus acciones, revise todo con cuidado y,  
+> "leea" e informese bien antes que nada.  
 > ___  
 
 > ___  
 > [!CAUTION] :no_entry_sign:  
->  - No nos haremos resposables bajo ningun motivo ante cualquier problema o,  
-inconveniente que pudiera u no surgir.
+>  - No nos haremos resposables bajo ningun motivo ante cualquier problema o, inconveniente que pudiera u no surgir.
 > ___  
   
   
