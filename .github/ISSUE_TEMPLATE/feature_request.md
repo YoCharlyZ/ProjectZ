@@ -1,0 +1,1 @@
+Plantilla para que los usuarios soliciten nuevas características o mejoras.

@@ -1,0 +1,3 @@
+Archivo vacío utilizado para agregar un directorio vacío a Git, 
+ya que Git no puede rastrear carpetas vacías. 
+Se utiliza para mantener la estructura del proyecto.

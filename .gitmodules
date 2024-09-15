@@ -1,0 +1,4 @@
+#Archivo que define los submódulos que se incluyen en el proyecto.
+#Los submódulos permiten incluir otro repositorio Git 
+#dentro del actual, manteniéndolo sincronizado con 
+#su propio historial.
