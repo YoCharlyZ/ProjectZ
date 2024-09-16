@@ -1,6 +1,7 @@
-### :radioactive: :biohazard: __ProjectZ__  :biohazard: :radioactive:  
+## :radioactive: :biohazard: __ProjectZ__  :biohazard: :radioactive:  
   
-<br>"a hombros de gigantes"  
+###### <br> "a hombros de gigantes"  
+###### <br>"la informacion que no es compartida en tiempo y forma, simplemente muere."  
 <br>  
 _Gracias a tod@s quienes comparten su pedacito de codigo con ejemplos a seguir,  
 y principalmente gracias a quienes brindan y dedican parte de su tiempo a enseñar.  
