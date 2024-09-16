@@ -2,7 +2,7 @@
   
 ###### <br> "a hombros de gigantes"  
 ###### <br>"la informacion que no es compartida en tiempo y forma, simplemente muere."  
-<br>  
+###### <br>  
 _Gracias a tod@s quienes comparten su pedacito de codigo con ejemplos a seguir,  
 y principalmente gracias a quienes brindan y dedican parte de su tiempo a enseñar.  
 Mis mejores deseos para todas las buenas personas que han y continuan apoyando a otr@s a aprender._  
