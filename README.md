@@ -31,16 +31,16 @@ _GRACIAS._
         - [ ] Destruir el Monopolio Utopico.  
       - [ ] Evitar la secuela Matrix4.  
     - [ ] Actualizar Version. :hammer_and_wrench:  
-      - [ ] Solucionar Comunicacion Software Serial.  
+      - [x] Solucionar Comunicacion Software Serial.  
   
   * __No Funciona :__  
     - [x] Varias Cosas.  
-      - [ ] Comunicacion Software Serial.  
+      - [x] Comunicacion Software Serial.  
   
   + __Estado :__  
     - [ ] Stable : (proximamente:)	  
     - [x] Dev : En Desarrollo. :radioactive::biohazard:   
-    - [ ] Trabajando Comunicacion Software Serial.  
+      - [x] Trabajando Comunicacion Software Serial.  
   
 [Autor y Contribuyentes](.github/CONTRIBUTING.md) :coffee:  
   
