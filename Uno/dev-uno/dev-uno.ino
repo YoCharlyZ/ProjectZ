@@ -277,17 +277,376 @@
     }
   */
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
+#include <SoftwareSerial.h> // https://github.com/arduino/ArduinoCore-avr/tree/master/libraries/SoftwareSerial
+//#include <EEPROM.h> // https://github.com/arduino/ArduinoCore-avr/tree/master/libraries/EEPROM
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////|
+unsigned long timeLine0 = 0;         //| Dedicado para Software Serial
+unsigned long timeLine1 = 0;         //| 
+unsigned long timeLine2 = 0;         //| 
+unsigned long timeLine3 = 0;         //| 
+unsigned long timeLine4 = 0;         //| 
+unsigned long timeLine5 = 0;         //|  
+//unsigned long timeLine64 = 590000; //| 
+///////////////////////////////////////| 
+const uint8_t softRX = 2;            //| 
+const uint8_t softTX = 4;            //| 
+///////////////////////////////////////|
+bool master_loadConfig = false;      //| 
+bool slave_loadConfig = false;       //| 
+bool flag_restart = true;            //| 
+///////////////////////////////////////|
+//_______________________________________________________________
+// Definición de constantes para los pines analógicos y digitales
+const uint8_t pinA0 = A0, pinA1 = A1, pinA2 = A2, pinA3 = A3, pinA4 = A4, pinA5 = A5;
+const uint8_t/*pinD0 = 0, pinD1 = 1, pinD2 = 2,*/ pinD3 = 3, /*pinD4 = 4, */pinD5 = 5;
+const uint8_t pinD6 = 6, pinD7 = 7, pinD8 = 8, pinD9 = 9, pinD10 = 10, pinD11 = 11;
+const uint8_t pinD12 = 12, pinD13 = 13;
+//___________________________________________________________________________________
+// Variables para almacenar los valores de los pines analógicos y digitales recibidos
+float valPinA0 = 0.00, valPinA1 = 0.00, valPinA2 = 0.00, valPinA3 = 0.00, valPinA4 = 0.00, valPinA5 = 0.00;
+uint8_t /*valPinD0 = 0, valPinD1 = 0, valPinD2 = 0,*/ valPinD3 = 0, /*valPinD4 = 0,*/ valPinD5 = 0;
+uint8_t valPinD6 = 0, valPinD7 = 0, valPinD8 = 0, valPinD9 = 0, valPinD10 = 0, valPinD11 = 0, valPinD12 = 0, valPinD13 = 0;
+//_________________________________________________________
+// Configuracion dedicada a la comunicacion Software Serial  
+SoftwareSerial softSerial(softRX, softTX); // Instanciamos SoftwareSerial con pines RX y TX definidos
+struct controlDataPins {
+  float val_pinA0, val_pinA1, val_pinA2, val_pinA3, val_pinA4, val_pinA5;
+  uint8_t /*val_pinD0, val_pinD1, val_pinD2,*/ val_pinD3, /*val_pinD4,*/ val_pinD5;
+  uint8_t val_pinD6, val_pinD7, val_pinD8, val_pinD9, val_pinD10, val_pinD11, val_pinD12, val_pinD13;
+};
+controlDataPins controlData;  // Instanciamos el struct usando asignación de memoria estatica
+const char charInit = '<'; // esto se envia antes del struct y fuera de este
+const char charEnd = '>'; // esto se envia despues del struct y fuera de este
+const uint8_t maxSize = sizeof(controlDataPins)+2; // esto es el tamaño que ocupe el struct + los 2 caracteres de control
+const uint8_t maxTimeWait = 450; // esto es el tiempo maximo que puede tomarse o descartara todo completamente
+////////////////////////////////////////////////////////////////////////////////////////////////////////////  
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////    
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
 void setup() {  
-  
+  setupInit();
+  setupSoftSerial();
+  setupEnding();
 }    
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////    
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
 void loop() {  
-  
+  if (millis() >= timeLine0 + 500) {
+
+    handleSoftSerial();
+    
+    timeLine0 = millis();
+  }
+  if (millis() >= timeLine1 + 1000) {
+   // otras acciones menos eventuales 
+   // otras acciones menos eventuales 
+  }
+  if (millis() >= timeLine2 + 2000) {
+    // otras acciones menos eventuales 
+    // otras acciones menos eventuales 
+    // otras acciones menos eventuales 
+    timeLine2 = millis();
+  }
+  if (millis() >= timeLine3 + 3000) {
+    // otras acciones menos eventuales 
+    // otras acciones menos eventuales 
+    // otras acciones menos eventuales 
+    // otras acciones menos eventuales 
+    timeLine3 = millis();
+  }
+  if (millis() >= timeLine4 + 4000) {
+    // otras acciones menos eventuales 
+    // otras acciones menos eventuales 
+    // otras acciones menos eventuales 
+    // otras acciones menos eventuales 
+    timeLine4 = millis();
+  }
+  if (millis() >= timeLine5 + 5000) {
+    // otras acciones menos eventuales 
+    // otras acciones menos eventuales 
+    // otras acciones menos eventuales 
+    // otras acciones menos eventuales 
+    timeLine5 = millis();
+  }
+  /*if (millis) >= timeLine64 + 590000) {
+   
+    timeLine64 = millis();
+  }*/
 }  
+////////////////////////////////////////////////////////////////////////////////////////////////////////////  
+////////////////////////////////////////////////////////////////////////////////////////////////////////////  
+////////////////////////////////////////////////////////////////////////////////////////////////////////////  
+void setupInit(){ // Configuraciones iniciales
+  Serial.begin(115200, SERIAL_8N1); // Inicializa puerto de comunicacion Hardware Serial
+  Serial.println(F("Iniciando..."));
+  Serial.println(F("Puerto Hardware Serial: Iniciado Correctamente."));
+  Serial.println();
+  Serial.println();
+  Serial.println(F("================================================================================"));
+  Serial.println(F("|                                                                              |"));
+  Serial.println(F("|                                 Bienvenido                                   |"));
+  Serial.println(F("|                =============================================                 |"));
+  Serial.println(F("|                                                                              |"));
+  Serial.println(F("|    Authur:     CharlyZ                                                       |"));
+  Serial.println(F("|    Repository: https://github.com/YoCharlyZ/ProjectZ                         |"));
+  Serial.println(F("|    Init Date Version: V. 0.0.1 - 23th March 2022                             |"));
+  Serial.println(F("|    Count Versions Previous: 28                                               |"));
+  Serial.println(F("|    Current Date Version: V. 0.2.9 - 10th September 2024                      |"));
+  Serial.println(F("|                                                                              |"));
+  Serial.println(F("================================================================================"));
+  Serial.println();
+  Serial.println();  
+
+  setupConfigPins();
+}
+void setupConfigPins(){ // Configura los pines como entrada o salida según corresponda
+
+  //pinMode(LED_BUILTIN, OUTPUT);
+  //digitalWrite(LED_BUILTIN, HIGH);
+  pinMode(pinA0, INPUT);
+  pinMode(pinA1, INPUT);
+  pinMode(pinA2, INPUT);
+  pinMode(pinA3, INPUT);
+  pinMode(pinA4, INPUT);
+  pinMode(pinA5, INPUT);
+    
+  //pinMode(pinD0, INPUT); digitalWrite(pinD0, valPinD0);
+  //pinMode(pinD1, OUTPUT); digitalWrite(pinD1, valPinD1);
+  //pinMode(pinD2, INPUT); digitalWrite(pinD2, valPinD2);
+   pinMode(pinD3, OUTPUT); digitalWrite(pinD3, valPinD3);
+  //pinMode(pinD4, OUTPUT); digitalWrite(pinD4, valPinD4);
+  pinMode(pinD5, OUTPUT); digitalWrite(pinD5, valPinD5);
+  pinMode(pinD6, OUTPUT); digitalWrite(pinD6, valPinD6);
+  pinMode(pinD7, OUTPUT); digitalWrite(pinD7, valPinD7);
+  pinMode(pinD8, OUTPUT); digitalWrite(pinD8, valPinD8);
+  pinMode(pinD9, OUTPUT); digitalWrite(pinD9, valPinD9);
+  pinMode(pinD10, OUTPUT); digitalWrite(pinD10, valPinD10);
+  pinMode(pinD11, OUTPUT); digitalWrite(pinD11, valPinD11);
+  pinMode(pinD12, OUTPUT); digitalWrite(pinD12, valPinD12);
+  pinMode(pinD13, OUTPUT); digitalWrite(pinD13, valPinD13);
+}
+void setupSoftSerial(){ // Configura el Software Serial y Prepara el Struct que utilizara
+
+  softSerial.begin(9600); // Inicializa puerto de comunicacion Software Serial
+  Serial.println(F("Puerto Software Serial: Iniciado Correctamente."));
+  
+  memset(&controlData, 0, sizeof(controlDataPins));  // Usamos la referencia al struct estático // Limpia la memoria del struct (opcional ya que ya se inicializó)
+  
+  // Inicializamos el Struc controlData con valores preestablecidos por defecto
+  Serial.println(F("Inicializando valores predefinidos para el Struct controlData..."));
+  controlData.val_pinA0 = valPinA0;
+  controlData.val_pinA1 = valPinA1;
+  controlData.val_pinA2 = valPinA2;
+  controlData.val_pinA3 = valPinA3;
+  controlData.val_pinA4 = valPinA4;
+  controlData.val_pinA5 = valPinA5;
+  
+  //controlData.val_pinD0 = valPinD0;
+  //controlData.val_pinD1 = valPinD1;
+  //controlData.val_pinD2 = valPinD2;
+  controlData.val_pinD3 = valPinD3;
+  //controlData.val_pinD4 = valPinD4;
+  controlData.val_pinD5 = valPinD5;
+  controlData.val_pinD6 = valPinD6;
+  controlData.val_pinD7 = valPinD7;
+  controlData.val_pinD8 = valPinD8;
+  controlData.val_pinD9 = valPinD9;
+  controlData.val_pinD10 = valPinD10;
+  controlData.val_pinD11 = valPinD11;
+  controlData.val_pinD12 = valPinD12;
+  controlData.val_pinD13 = valPinD13;
+
+  Serial.println(F("Struct controlData inicializado correctamente."));
+  
+}
+void setupEnding(){ // Configuraciones finales
+  
+  Serial.println();
+  Serial.println();
+  Serial.println(F("================================================================================"));
+  Serial.println(F("|                                                                              |"));
+  Serial.println(F("|                                 Bienvenido                                   |"));
+  Serial.println(F("|                =============================================                 |"));
+  Serial.println(F("|                                                                              |"));
+  Serial.println(F("|    Authur:     CharlyZ                                                       |"));
+  Serial.println(F("|    Repository: https://github.com/YoCharlyZ/ProjectZ                         |"));
+  Serial.println(F("|    Init Date Version: V. 0.0.1 - 23th March 2022                             |"));
+  Serial.println(F("|    Count Versions Previous: 28                                               |"));
+  Serial.println(F("|    Current Date Version: V. 0.2.9 - 10th September 2024                      |"));
+  Serial.println(F("|                                                                              |"));
+  Serial.println(F("================================================================================"));
+  Serial.println();
+  Serial.println();  
+
+  Serial.println(F("Inicializando Funciones de Algo++..."));
+  
+  updateDataPins();
+
+  Serial.println(F("Gracias por esperar"));
+  Serial.println(F("Inicializaciones Terminadas Correctamente"));
+  Serial.println(F("usted es el jefe de los minisuper?"));
+  Serial.println(F("enserio??"));
+  Serial.println(F("usted???"));
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void rwDataPins(){ // Lee y escribe correspondientemente los pines segun las variables globales
+  valPinA0 = analogRead(pinA0);
+  valPinA1 = analogRead(pinA1);
+  valPinA2 = analogRead(pinA2);
+  valPinA3 = analogRead(pinA3);
+  valPinA4 = analogRead(pinA4);
+  valPinA5 = analogRead(pinA5);
+
+  //valPinD0 = digitalRead(pinD0);
+  //valPinD1 = digitalRead(pinD1);
+  //valPinD2 = digitalRead(pinD2);
+  valPinD3 = digitalRead(pinD3);
+  //valPinD4 = digitalRead(pinD4);
+  valPinD5 = digitalRead(pinD5);
+  valPinD6 = digitalRead(pinD6);
+  valPinD7 = digitalRead(pinD7);
+  valPinD8 = digitalRead(pinD8);
+  valPinD9 = digitalRead(pinD9);
+  valPinD10 = digitalRead(pinD10);
+  valPinD11 = digitalRead(pinD11);
+  valPinD12 = digitalRead(pinD12);
+  valPinD13 = digitalRead(pinD13);
+
+}
+void infoDataPins() { // Imprime los valores actuales de las variables globales
+
+  Serial.println(F("Estados y Valores Actuales de Variables Compartidas: "));
+  Serial.print("< ");
+  Serial.print(F("Master: ")); Serial.print(master_loadConfig); Serial.print(", ");
+  Serial.print(F("Slave: ")); Serial.print(slave_loadConfig);
+  Serial.println(" >");
+
+  Serial.println(F("Estados y Valores Actuales de Pines Analogicos: "));
+  Serial.print("< ");
+  Serial.print(F("A0: ")); Serial.print(valPinA0); Serial.print(F(", "));
+  Serial.print(F("A1: ")); Serial.print(valPinA1); Serial.print(F(", "));
+  Serial.print(F("A2: ")); Serial.print(valPinA2); Serial.print(F(", "));
+  Serial.print(F("A3: ")); Serial.print(valPinA3); Serial.print(F(", "));
+  Serial.print(F("A4: ")); Serial.print(valPinA4); Serial.print(F(", "));
+  Serial.print(F("A5: ")); Serial.print(valPinA5);
+  Serial.println(" >");
+
+  Serial.println(F("Estados y Valores Actuales de Pines Digitales: "));
+  Serial.print("< ");
+  //Serial.print(F("D0: ")); Serial.print(valPinD0); Serial.print(F(", "));
+  //Serial.print(F("D1: ")); Serial.print(valPinD1); Serial.print(F(", "));
+  //Serial.print(F("D2: ")); Serial.print(valPinD2); Serial.print(F(", "));
+  Serial.print(F("D3: ")); Serial.print(valPinD3); Serial.print(F(", "));
+  //Serial.print(F("D4: ")); Serial.print(valPinD4); Serial.print(F(", "));
+  Serial.print(F("D5: ")); Serial.print(valPinD5); Serial.print(F(", "));
+  Serial.print(F("D6: ")); Serial.print(valPinD6); Serial.print(F(", "));
+  Serial.print(F("D7: ")); Serial.print(valPinD7); Serial.print(F(", "));
+  Serial.print(F("D8: ")); Serial.print(valPinD8); Serial.print(F(", "));
+  Serial.print(F("D9: ")); Serial.print(valPinD9); Serial.print(F(", "));
+  Serial.print(F("D10: ")); Serial.print(valPinD10); Serial.print(F(", "));
+  Serial.print(F("D11: ")); Serial.print(valPinD11); Serial.print(F(", "));
+  Serial.print(F("D12: ")); Serial.print(valPinD12); Serial.print(F(", "));
+  Serial.print(F("D13: ")); Serial.print(valPinD13);
+  Serial.println(" >");
+}
+void updateDataPins() { // Actualiza los valores de las variables globales segun los datos del Struct dataControl
+    
+  valPinA0 = (controlData.val_pinA0);
+  valPinA1 = (controlData.val_pinA1);
+  valPinA2 = (controlData.val_pinA2);
+  valPinA3 = (controlData.val_pinA3);
+  valPinA4 = (controlData.val_pinA4);
+  valPinA5 = (controlData.val_pinA5);
+
+  //valPinD0 = (controlData.val_pinD0);
+  //valPinD1 = (controlData.val_pinD1);
+  //valPinD2 = (controlData.val_pinD2);
+  valPinD3 = (controlData.val_pinD3);
+  //valPinD4 = (controlData.val_pinD4);
+  valPinD5 = (controlData.val_pinD5);
+  valPinD6 = (controlData.val_pinD6);
+  valPinD7 = (controlData.val_pinD7);
+  valPinD8 = (controlData.val_pinD8);
+  valPinD9 = (controlData.val_pinD9);
+  valPinD10 = (controlData.val_pinD10);
+  valPinD11 = (controlData.val_pinD11);
+  valPinD12 = (controlData.val_pinD12);
+  valPinD13 = (controlData.val_pinD13);
+
+}
+void readSoftSerial() { // Recibe los datos por Software Serial
+  Serial.println(F("Intentando recibir datos por Software Serial..."));
+
+  if (softSerial.available() > 0) {  // Verificar si hay datos disponibles
+    char dataChar = (char)softSerial.read();  // Leer el primer byte
+
+    if (dataChar == charInit) { // Verificar si el carácter de inicio coincide
+      Serial.println(F("Caracter de inicio reconocido, leyendo..."));
+      
+      timeLine0 = millis();  // Guardar el tiempo de inicio de recepción
+
+      if (millis() >= timeLine0 + maxTimeWait) { // Esperar los datos dentro del tiempo máximo permitido
+        if (softSerial.available() >= (int)sizeof(controlDataPins)) {  // Verificar si llegaron todos los datos
+          
+          // Leer los datos del struct controlDataPins
+          softSerial.readBytes(reinterpret_cast<char*>(&controlData), sizeof(controlDataPins));
+          Serial.println(F("Datos recibidos por Software Serial:"));
+
+          for (size_t i = 0; i < sizeof(controlDataPins); i++) { // Imprimir los datos recibidos
+            Serial.print(reinterpret_cast<char*>(&controlData)[i]); // Opción: imprimir como caracteres ASCII
+            //Serial.print(reinterpret_cast<char*>(&controlData)[i], DEC); // Opción: imprimir en decimal
+            //Serial.print(reinterpret_cast<char*>(&controlData)[i], BIN); // Opción: imprimir en binario
+            //Serial.print(reinterpret_cast<char*>(&controlData)[i], OCT); // Opción: imprimir en octal
+            Serial.print(" ");  // Espacio entre bytes
+          }
+          Serial.println();  // Salto de línea al final
+
+          if (softSerial.read() == charEnd) { // Verificar si el carácter de fin coincide
+            Serial.println(F("Carácter de fin reconocido"));
+            return;  // Finalizar si todo está correcto
+          } else {
+            Serial.println(F("Carácter de fin no reconocido"));
+          }
+        }
+      }
+
+      Serial.println(F("Tiempo de espera agotado"));
+      softSerial.flush();  // Limpiar el buffer si no se completó la recepción
+    } else {
+      Serial.println(F("Carácter de inicio no reconocido"));
+    }
+  } else {
+    Serial.println(F("No hay datos disponibles en Software Serial"));
+  }
+}
+void sendSoftSerial() { // Envia los datos por Software Serial
+  Serial.println(F("Enviando datos por Software Serial..."));
+
+  softSerial.write(charInit); // Enviar el carácter de inicio
+
+  // Enviar los datos del struct controlDataPins byte por byte
+  softSerial.write(reinterpret_cast<char*>(&controlData), sizeof(controlDataPins));
+  softSerial.write(charEnd); // Enviar el carácter de fin
+
+  Serial.println(F("Datos enviados por Software Serial:"));
+  
+  for (size_t i = 0; i < sizeof(controlDataPins); i++) { // Imprimir los datos enviados para verificación
+    Serial.print(reinterpret_cast<char*>(&controlData)[i]); // Opción: imprimir como caracteres ASCII
+    //Serial.print(reinterpret_cast<char*>(&controlData)[i], DEC); // Opción: imprimir en decimal
+    //Serial.print(reinterpret_cast<char*>(&controlData)[i], BIN); // Opción: imprimir en binario
+    //Serial.print(reinterpret_cast<char*>(&controlData)[i], OCT); // Opción: imprimir en octal
+    Serial.print(" ");  // Espacio entre bytes
+  }
+  Serial.println();  // Salto de línea al final
+}
+void handleSoftSerial(){ // Gestion general del Software Serial
+  readSoftSerial();
+  updateDataPins();
+  rwDataPins();
+  sendSoftSerial();
+  infoDataPins();
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
