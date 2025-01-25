@@ -17,7 +17,7 @@ _GRACIAS._
   + __Trabajando :__  
     - [x] En todo. :smile:  
     - [ ] Lista de pendientes<sup>3</sup>.  
-      - [ ] Comunicacion Software Serial.  
+      - [x] Comunicacion Software Serial.  
         - [x] Dev - Uno.  
         - [ ] Dev - Esp01s.  
         - [x] Dev - Nodemcu8266.  
@@ -31,13 +31,15 @@ _GRACIAS._
         - [ ] Destruir el Monopolio Utopico.  
       - [ ] Evitar la secuela Matrix4.  
     - [ ] Actualizar Version. :hammer_and_wrench:  
-      - [x] Solucionar Comunicacion Software Serial.  
+      - [ ] Portar version a otras placas.  
+
+  + __Funciona :__    
+    - [x] Comunicacion Software Serial.  
+
+  - __No Funciona :__  
+    - [ ] Varias Cosas.  
   
-  * __No Funciona :__  
-    - [x] Varias Cosas.  
-      - [x] Comunicacion Software Serial.  
-  
-  + __Estado :__  
+  * __Estado :__  
     - [ ] Stable : (proximamente:)	  
     - [x] Dev : En Desarrollo. :radioactive::biohazard:   
       - [x] Trabajando Comunicacion Software Serial.  

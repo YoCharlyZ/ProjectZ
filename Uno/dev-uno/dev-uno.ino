@@ -9,9 +9,9 @@
   
       PD0   D0   RX0  ---> mientras se usen impedira la reprogramacion (no usar) <---|  
       PD1   D1   TX0  ---> mientras se usen impedira la reprogramacion (no usar) <---|  
-      PD2   D2        --->  
-      PD3   D3   pwm  --->  
-      PD4   D4        --->  
+      PD2   D2        ---> softTX <--- softRX D3gpio0 NodeMcu <--|
+      PD3   D3   pwm  ---> 
+      PD4   D4        ---> softRX <--- softRX D4gpio2 NodeMcu <--|
       PD5   D5   pwm  --->  
       PD6   D6   pwm  --->  
       PD7   D7        --->  
@@ -22,7 +22,7 @@
       PB3   D11  pwm  --->  MOSI   --->  
       PB4   D12       --->  MISO   --->  
       PB5   D13       --->  SCLK   --->  
-            GND       --->   gnd   --->  
+            GND       --->  GND   <--- GND NodeMcu <--|  
             AREF      --->  
       PC5   SCL   A5  --->  
       PC4   SDA   A4  --->  
@@ -31,8 +31,8 @@
       PC6   D14 RESET --->  <---|  
             VCC       --->  +3.3vcc --->!  
             VCC       --->  +5vcc   --->!  
-            GND       --->   gnd    --->  
-            GND       --->   gnd    --->  
+            GND       --->   GND   <--- GND NodeMcu <--|  
+            GND       --->   GND   <--- GND NodeMcu <--|  
             VIN       --->  +3.3 a +12vcc --->!  
       PC0   A0        --->  
       PC1   A1        --->  
@@ -76,7 +76,7 @@
       gpio11   CMD   --->  cs/ss ---> no usar <---|  
       gpio7    SD0   --->  miso  ---> no usar <---|  
       gpio6    SCLK  --->  sclk  ---> no usar <---|    
-      GND            --->  gnd     --->  
+      GND            --->   GND  <---  GND Uno <--|   
       VCC            --->  +3.3vcc --->!  
       EN             --->  Enable  ---> Encendido pullUp4.7k/+3.3vcc  
       RST            --->  <---|  
@@ -85,17 +85,17 @@
       gpio16   D0    ---> (el unico que sirve para despertar) --->  
       gpio5    D1    --->    SCL   pullUp4.7k/+3.3vcc   --->  
       gpio4    D2    --->    SDA   pullUp4.7k/+3.3vcc   --->  
-      gpio0    D3    ---> pullUp4.7k/+3.3vcc (arranque normal) --->  
-      gpio2    D4    ---> pullUp4.7k/+3.3vcc (arranque normal) --->  
+      gpio0    D3    ---> pullUp4.7k/+3.3vcc (arranque normal) ---> softRX <--- softTX pinD2 Uno <--|
+      gpio2    D4    ---> pullUp4.7k/+3.3vcc (arranque normal) ---> softTX <--- softRX pinD4 Uno <--|
       VCC            --->  +3.3vcc --->!  
-      GND            --->   gnd    --->  
+      GND            --->   GND   <--- GND Uno <--|  
       gpio14   D5    --->   SCLK   --->  
       gpio12   D6    --->   MISO   --->  
       gpio13   D7    --->   MOSI   --->  
       gpio15   D8    --->   CC/SS  --->  
       gpio3    RX    ---> mientras se usen impedira la reprogramacion (no usar) <---|  
       gpio1    TX    ---> mientras se usen impedira la reprogramacion (no usar) <---|  
-      GND            --->   gnd    --->  
+      GND            --->   GND   <--- GND Uno <--|   
       VCC            --->  +3.3vcc --->!  
   
     }  
@@ -277,64 +277,115 @@
     }
   */
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
-#include <SoftwareSerial.h> // https://github.com/arduino/ArduinoCore-avr/tree/master/libraries/SoftwareSerial
-//#include <EEPROM.h> // https://github.com/arduino/ArduinoCore-avr/tree/master/libraries/EEPROM
+#include <SoftwareSerial.h> // https://github.com/plerup/espsoftwareserial/  
+//#include <EEPROM.h> // https://github.com/esp8266/Arduino/tree/master/libraries/EEPROM  
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////|
+///////////////////////////////////////| 
 unsigned long timeLine0 = 0;         //| Dedicado para Software Serial
 unsigned long timeLine1 = 0;         //| 
 unsigned long timeLine2 = 0;         //| 
 unsigned long timeLine3 = 0;         //| 
 unsigned long timeLine4 = 0;         //| 
-unsigned long timeLine5 = 0;         //|  
-//unsigned long timeLine64 = 590000; //| 
+unsigned long timeLine5 = 0;         //| 
+//unsigned long timeLine64 = 590000; //|
 ///////////////////////////////////////| 
-const uint8_t softRX = 2;            //| 
-const uint8_t softTX = 4;            //| 
-///////////////////////////////////////|
+const uint8_t softRX = 4;            //| 
+const uint8_t softTX = 2;            //|  
+///////////////////////////////////////| 
+const uint8_t pinSDA = 4;            //|  
+const uint8_t pinSCL = 5;            //|  
+///////////////////////////////////////| 
+const uint8_t CS_SD = 15;            //| 
+///////////////////////////////////////| 
 bool master_loadConfig = false;      //| 
 bool slave_loadConfig = false;       //| 
 bool flag_restart = true;            //| 
-///////////////////////////////////////|
-//_______________________________________________________________
+///////////////////////////////////////| 
+const uint8_t targetID = 0;          //| Un ID especial reservado para algun fin especifico.
+const uint8_t mySlaveID = 8;         //| Mi ID de Esclavo
+const uint8_t toMasterID = 10;       //| El ID de al menos un Maestro
+const uint8_t broadcastID = 255;     //| Un ID para MultiDifusion
+///////////////////////////////////////| 
+uint16_t commSend = 0;               //|
+uint16_t commErr = 0;                //|
+uint16_t commOk = 0;                 //|
+//////////////////////////////////////////////| 
+const uint16_t softSerialBautRate = 9600;   //| Velocidad del SoftwareSerial
+const uint32_t hardSerialBautRate = 115200; //| Velocidad del Hardware Serial
+//////////////////////////////////////////////| 
+//________________________________________________________________________________________
 // Definición de constantes para los pines analógicos y digitales
 const uint8_t pinA0 = A0, pinA1 = A1, pinA2 = A2, pinA3 = A3, pinA4 = A4, pinA5 = A5;
 const uint8_t/*pinD0 = 0, pinD1 = 1, pinD2 = 2,*/ pinD3 = 3, /*pinD4 = 4, */pinD5 = 5;
 const uint8_t pinD6 = 6, pinD7 = 7, pinD8 = 8, pinD9 = 9, pinD10 = 10, pinD11 = 11;
 const uint8_t pinD12 = 12, pinD13 = 13;
-//___________________________________________________________________________________
-// Variables para almacenar los valores de los pines analógicos y digitales recibidos
-float valPinA0 = 0.00, valPinA1 = 0.00, valPinA2 = 0.00, valPinA3 = 0.00, valPinA4 = 0.00, valPinA5 = 0.00;
+// Variables Independientes para almacenar los valores de los pines analógicos y digitales
+char valCharInit = '<';
+float valPinA0 = 000.00, valPinA1 = 000.00, valPinA2 = 000.00, valPinA3 = 000.00, valPinA4 = 000.00, valPinA5 = 000.00;
 uint8_t /*valPinD0 = 0, valPinD1 = 0, valPinD2 = 0,*/ valPinD3 = 0, /*valPinD4 = 0,*/ valPinD5 = 0;
 uint8_t valPinD6 = 0, valPinD7 = 0, valPinD8 = 0, valPinD9 = 0, valPinD10 = 0, valPinD11 = 0, valPinD12 = 0, valPinD13 = 0;
+char valCharEnd = '>';
 //_________________________________________________________
 // Configuracion dedicada a la comunicacion Software Serial  
 SoftwareSerial softSerial(softRX, softTX); // Instanciamos SoftwareSerial con pines RX y TX definidos
-struct controlDataPins {
-  float val_pinA0, val_pinA1, val_pinA2, val_pinA3, val_pinA4, val_pinA5;
-  uint8_t /*val_pinD0, val_pinD1, val_pinD2,*/ val_pinD3, /*val_pinD4,*/ val_pinD5;
-  uint8_t val_pinD6, val_pinD7, val_pinD8, val_pinD9, val_pinD10, val_pinD11, val_pinD12, val_pinD13;
-};
-controlDataPins controlData;  // Instanciamos el struct usando asignación de memoria estatica
-const char charInit = '<'; // esto se envia antes del struct y fuera de este
-const char charEnd = '>'; // esto se envia despues del struct y fuera de este
-const uint8_t maxSize = sizeof(controlDataPins)+2; // esto es el tamaño que ocupe el struct + los 2 caracteres de control
-const uint8_t maxTimeWait = 450; // esto es el tiempo maximo que puede tomarse o descartara todo completamente
+//#pragma pack(1) // Definición del struct para manejar datos con directivas globales de empaquetamiento alineado a 1 byte sin relleno.
+// Definición del struct para manejar datos con atributo especifico de empaquetamiento alineado a 1 byte sin relleno.
+struct __attribute__((packed, aligned(1))) DataPacket {
+  char charInit;            // Carácter de inicio del paquete
+  uint8_t sourceID;         // ID de dispositivo remitente de origen
+  uint8_t destinationID;    // ID de dispositivo destinatario
+  
+  bool varMasterLoadConfig; // Estado lógico = 8 bits = 1 Byte
+  bool varSlaveLoadConfig; // Estado lógico = 8 bits = 1 Byte
+  bool varFlagRestart; // Estado lógico = 8 bits = 1 Byte
+  float varPinA0, varPinA1, varPinA2, varPinA3, varPinA4, varPinA5; // [(un solo float = 32 bits = 4 Bytes) x6] = 24 Bytes
+  uint8_t /*varPinD0, varPinD1, varPinD2,*/ varPinD3, /*varPinD4,*/ varPinD5; // [(8 bits = 1 Byte) x2] = 2 Bytes
+  uint8_t varPinD6, varPinD7, varPinD8, varPinD9, varPinD10, varPinD11, varPinD12, varPinD13; // [(8 bits = 1 Byte) x8] = 8 Bytes
+  
+  uint8_t structSize;       // Tamaño del struct = 8 bits = 1 Byte
+  uint8_t checksum;         // Para el checksum (1 Byte)
+  uint16_t crc;             // Para el CRC (2 Bytes)
+  char charEnd;             // Carácter de fin del paquete
+}; // #pragma pack() // Restaura las directivas globales del empaquetamiento a su propio predeterminado.
+// Variables globales para el struct de Inicialización explícita con caracteres de control
+DataPacket dataEnvio = {'<', 0, 0, false, false, true, 000.00, 000.00, 000.00, 000.00, 000.00, 000.00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, sizeof(DataPacket), 0, 0, '>'}; // Inicialización explícita con caracteres de control
+DataPacket dataRecibido = {'<', 0, 0, true, true, false, 000.00, 000.00, 000.00, 000.00, 000.00, 000.00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, '>'}; // Inicialización para recepción con caracteres de control
+//_________________________________________________________
+////////////////////////////////////////////////////////////////////////////////////////////////////////////  
+// Prototipos de funciones
+void setupInit(); // Configuraciónes iniciales del hardwardware
+void setupHardSerial(); // Configura el Hardware Serial 
+void setupSoftSerial(); // Configura el Softdware Serial
+void setupConfigPins(); // Configura los pines como entrada o salida según corresponda
+void setupPrintInfoVersion(); // Imprime Informacion y Detalles del Proyecto
+void setupEnd(); // Configuraciones finales y Mensaje de finalización del setup
+void calcularChecksum(); // Calcula el checksum y lo almacena directamente en el paquete
+void calcularCRC();  // Calcula el CRC y lo almacena directamente en el paquete
+void printSending(); // Imprime los datos enviados en varios formatos
+void printReceived(); // Imprime los datos recibidos en varios formatos
+void printVarsInternal(); // Imprime los datos de las variables intenas en varios formatos
+void updateStruct(); // Función para actualizar las variables independientes desde el struct recibido
+void updateVars(); // Función para actualizar las variables independientes desde el struct recibido
+void rwDataPins(); // Lee y escribe correspondientemente los pines segun las variables globales
+void readSoftSerial(); // Enviar datos mediante SoftwareSerial
+void sendSoftSerial();// Leer datos recibidos mediante SoftwareSerial
+void handleSoftSerial(); // Manejo del Software Serial (envío y recepción)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////    
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
-void setup() {  
-  setupInit();
-  setupSoftSerial();
-  setupEnding();
-}    
+void setup() {
+  setupInit(); // Configuraciónes iniciales del hardwardware
+  setupEnd();  // Configuraciones finales y Mensaje de finalización del setup
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////    
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
-void loop() {  
+void loop() {
+  handleSoftSerial();
+
   if (millis() >= timeLine0 + 500) {
 
-    handleSoftSerial();
+    // otras acciones menos eventuales 
     
     timeLine0 = millis();
   }
@@ -373,37 +424,32 @@ void loop() {
    
     timeLine64 = millis();
   }*/
-}  
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
+////////////////////////////////////////////////////////////////////////////////////////////////////////////    
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
-////////////////////////////////////////////////////////////////////////////////////////////////////////////  
-void setupInit(){ // Configuraciones iniciales
-  Serial.begin(115200, SERIAL_8N1); // Inicializa puerto de comunicacion Hardware Serial
+void setupInit(){ // Configuraciónes iniciales del hardwardware
+  setupHardSerial();
+  setupSoftSerial();
+  setupConfigPins();
+  setupPrintInfoVersion();
+  setupEnd();
+}
+void setupHardSerial(){ // Configura el Hardware Serial
+  Serial.begin(hardSerialBautRate, SERIAL_8N1); // Inicializa puerto de comunicacion Hardware Serial
   Serial.println(F("Iniciando..."));
   Serial.println(F("Puerto Hardware Serial: Iniciado Correctamente."));
-  Serial.println();
-  Serial.println();
-  Serial.println(F("================================================================================"));
-  Serial.println(F("|                                                                              |"));
-  Serial.println(F("|                                 Bienvenido                                   |"));
-  Serial.println(F("|                =============================================                 |"));
-  Serial.println(F("|                                                                              |"));
-  Serial.println(F("|    Authur:     CharlyZ                                                       |"));
-  Serial.println(F("|    Repository: https://github.com/YoCharlyZ/ProjectZ                         |"));
-  Serial.println(F("|    Init Date Version: V. 0.0.1 - 23th March 2022                             |"));
-  Serial.println(F("|    Count Versions Previous: 28                                               |"));
-  Serial.println(F("|    Current Date Version: V. 0.2.9 - 10th September 2024                      |"));
-  Serial.println(F("|                                                                              |"));
-  Serial.println(F("================================================================================"));
-  Serial.println();
-  Serial.println();  
-
-  setupConfigPins();
+}
+void setupSoftSerial(){ // Configura el Software Serial
+  pinMode(softRX, INPUT);    // Configura el pin RX como entrada
+  pinMode(softTX, OUTPUT);   // Configura el pin TX como salida
+  softSerial.begin(softSerialBautRate); // Inicializa puerto de comunicacion Software Serial
+  Serial.println(F("Puerto Software Serial: Iniciado Correctamente."));
 }
 void setupConfigPins(){ // Configura los pines como entrada o salida según corresponda
-
-  //pinMode(LED_BUILTIN, OUTPUT);
-  //digitalWrite(LED_BUILTIN, HIGH);
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+  //gpio17
   pinMode(pinA0, INPUT);
   pinMode(pinA1, INPUT);
   pinMode(pinA2, INPUT);
@@ -425,43 +471,9 @@ void setupConfigPins(){ // Configura los pines como entrada o salida según corr
   pinMode(pinD11, OUTPUT); digitalWrite(pinD11, valPinD11);
   pinMode(pinD12, OUTPUT); digitalWrite(pinD12, valPinD12);
   pinMode(pinD13, OUTPUT); digitalWrite(pinD13, valPinD13);
+  Serial.println(F("Inicialización y configuración de pines completada."));  
 }
-void setupSoftSerial(){ // Configura el Software Serial y Prepara el Struct que utilizara
-
-  softSerial.begin(9600); // Inicializa puerto de comunicacion Software Serial
-  Serial.println(F("Puerto Software Serial: Iniciado Correctamente."));
-  
-  memset(&controlData, 0, sizeof(controlDataPins));  // Usamos la referencia al struct estático // Limpia la memoria del struct (opcional ya que ya se inicializó)
-  
-  // Inicializamos el Struc controlData con valores preestablecidos por defecto
-  Serial.println(F("Inicializando valores predefinidos para el Struct controlData..."));
-  controlData.val_pinA0 = valPinA0;
-  controlData.val_pinA1 = valPinA1;
-  controlData.val_pinA2 = valPinA2;
-  controlData.val_pinA3 = valPinA3;
-  controlData.val_pinA4 = valPinA4;
-  controlData.val_pinA5 = valPinA5;
-  
-  //controlData.val_pinD0 = valPinD0;
-  //controlData.val_pinD1 = valPinD1;
-  //controlData.val_pinD2 = valPinD2;
-  controlData.val_pinD3 = valPinD3;
-  //controlData.val_pinD4 = valPinD4;
-  controlData.val_pinD5 = valPinD5;
-  controlData.val_pinD6 = valPinD6;
-  controlData.val_pinD7 = valPinD7;
-  controlData.val_pinD8 = valPinD8;
-  controlData.val_pinD9 = valPinD9;
-  controlData.val_pinD10 = valPinD10;
-  controlData.val_pinD11 = valPinD11;
-  controlData.val_pinD12 = valPinD12;
-  controlData.val_pinD13 = valPinD13;
-
-  Serial.println(F("Struct controlData inicializado correctamente."));
-  
-}
-void setupEnding(){ // Configuraciones finales
-  
+void setupPrintInfoVersion(){ // Imprime Informacion y Detalles del Proyecto
   Serial.println();
   Serial.println();
   Serial.println(F("================================================================================"));
@@ -472,25 +484,243 @@ void setupEnding(){ // Configuraciones finales
   Serial.println(F("|    Authur:     CharlyZ                                                       |"));
   Serial.println(F("|    Repository: https://github.com/YoCharlyZ/ProjectZ                         |"));
   Serial.println(F("|    Init Date Version: V. 0.0.1 - 23th March 2022                             |"));
-  Serial.println(F("|    Count Versions Previous: 28                                               |"));
-  Serial.println(F("|    Current Date Version: V. 0.2.9 - 10th September 2024                      |"));
+  Serial.println(F("|    Count Versions Previous: 29                                               |"));
+  Serial.println(F("|    Current Date Version: V. 0.3.0 - 21th January 2025                        |"));
   Serial.println(F("|                                                                              |"));
   Serial.println(F("================================================================================"));
   Serial.println();
   Serial.println();  
-
-  Serial.println(F("Inicializando Funciones de Algo++..."));
+}
+void setupEnd(){ // Configuraciones finales y Mensaje de finalización del setup
   
-  updateDataPins();
-
+  Serial.println(F("Inicializando Funciones de Algo++..."));
+  digitalWrite(LED_BUILTIN, HIGH);
   Serial.println(F("Gracias por esperar"));
+  digitalWrite(LED_BUILTIN, LOW);
   Serial.println(F("Inicializaciones Terminadas Correctamente"));
+  digitalWrite(LED_BUILTIN, HIGH);
   Serial.println(F("usted es el jefe de los minisuper?"));
+  digitalWrite(LED_BUILTIN, LOW);
   Serial.println(F("enserio??"));
+  digitalWrite(LED_BUILTIN, HIGH);
   Serial.println(F("usted???"));
+  digitalWrite(LED_BUILTIN, LOW);
+
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void calcularChecksum(DataPacket* paquete) { // Calcula el checksum y lo almacena directamente en el paquete
+  uint8_t suma = 0;
+  uint8_t* ptr = reinterpret_cast<uint8_t*>(paquete);
+  for (size_t i = 0; i < sizeof(DataPacket) - 3; i++) { // Excluye checksum y CRC
+    suma += ptr[i];
+  }
+  paquete->checksum = suma; // Actualiza el campo checksum
+}
+void calcularCRC(DataPacket* paquete) { // Calcula el CRC y lo almacena directamente en el paquete
+  uint16_t crc = 0xFFFF; // Valor inicial
+  uint8_t* ptr = reinterpret_cast<uint8_t*>(paquete);
+  for (size_t i = 0; i < sizeof(DataPacket) - 2; i++) { // Excluye el campo CRC
+    crc ^= (uint16_t)ptr[i] << 8;
+    for (uint8_t j = 0; j < 8; j++) {
+      if (crc & 0x8000) crc = (crc << 1) ^ 0x8005;
+      else crc = crc << 1;
+    }
+  }
+  paquete->crc = crc; // Actualiza el campo CRC
+}
+
+void printSending() { // Imprime los datos enviados en varios formatos
+  Serial.println(F("Datos enviados:"));
+  Serial.print(F("Inicio: ")); Serial.print(dataEnvio.charInit); Serial.print(F(" (Hex: 0x")); Serial.print(dataEnvio.charInit, HEX); Serial.println(F(")"));
+  Serial.print(F("SourceID: ")); Serial.print(dataEnvio.sourceID); Serial.print(F(" (Hex: 0x")); Serial.print(dataEnvio.sourceID, HEX); Serial.println(F(")"));
+  Serial.print(F("DestinationID: ")); Serial.print(dataEnvio.destinationID); Serial.print(F(" (Hex: 0x")); Serial.print(dataEnvio.destinationID, HEX); Serial.println(F(")"));
+  
+  Serial.print(F("Estado del Maestro: ")); Serial.println(dataEnvio.varMasterLoadConfig ? "true" : "false");
+  Serial.print(F("Estado del Esclavo: ")); Serial.println(dataEnvio.varSlaveLoadConfig ? "true" : "false");
+  Serial.print(F("Estado de Reinicio: ")); Serial.println(dataEnvio.varFlagRestart ? "true" : "false");
+  
+  Serial.println(F("Valores Pines Analogicos: "));
+  Serial.print(F("A0 ")); Serial.print(dataEnvio.varPinA0); 
+  Serial.print(F(", A1 ")); Serial.print(dataEnvio.varPinA1); 
+  Serial.print(F(", A2 ")); Serial.print(dataEnvio.varPinA2); 
+  Serial.print(F(", A3 ")); Serial.print(dataEnvio.varPinA3);
+  Serial.print(F(", A4 ")); Serial.print(dataEnvio.varPinA4); 
+  Serial.print(F(", A5 ")); Serial.print(dataEnvio.varPinA5); 
+  Serial.println(F(". ")); 
+  
+  Serial.println(F("Valores Pines Digitales: "));
+  //Serial.print(F("D0 ")); Serial.print(dataEnvio.varPinD0); 
+  //Serial.print(F(", D1 ")); Serial.print(dataEnvio.varPinD1); 
+  //Serial.print(F(", D2 ")); Serial.print(dataEnvio.varPinD2); 
+  Serial.print(F("D3 ")); Serial.print(dataEnvio.varPinD3); 
+  //Serial.print(F(", D4 ")); Serial.print(dataEnvio.varPind4);
+  Serial.print(F(", D5 ")); Serial.print(dataEnvio.varPinD5); 
+  Serial.print(F(", D6 ")); Serial.print(dataEnvio.varPinD6);
+  Serial.print(F(", D7 ")); Serial.print(dataEnvio.varPinD7); 
+  Serial.print(F(", D8 ")); Serial.print(dataEnvio.varPinD8);
+  Serial.print(F(", D9 ")); Serial.print(dataEnvio.varPinD9);
+  Serial.print(F(", D10 ")); Serial.print(dataEnvio.varPinD10);
+  Serial.print(F(", D11 ")); Serial.print(dataEnvio.varPinD11); 
+  Serial.print(F(", D12 ")); Serial.print(dataEnvio.varPinD12); 
+  Serial.print(F(", D13 ")); Serial.print(dataEnvio.varPinD13); 
+  Serial.println(F(". "));
+  
+  Serial.print(F("Tamaño del paquete: ")); Serial.print(dataEnvio.structSize); Serial.print(F(" (Hex: 0x")); Serial.print(dataEnvio.structSize, HEX); Serial.println(F(")"));
+  Serial.print(F("CheckSum del paquete: ")); Serial.print(dataEnvio.checksum); Serial.print(F(" (Hex: 0x")); Serial.print(dataEnvio.checksum, HEX); Serial.println(F(")"));
+  Serial.print(F("CRC del paquete: ")); Serial.print(dataEnvio.crc); Serial.print(F(" (Hex: 0x")); Serial.print(dataEnvio.crc, HEX); Serial.println(F(")"));
+  Serial.print(F("Fin: ")); Serial.print(dataEnvio.charEnd); Serial.print(F(" (Hex: 0x")); Serial.print(dataEnvio.charEnd, HEX); Serial.println(F(")"));
+  Serial.println(F(" "));
+}
+void printReceived() { // Imprime los datos recibidos en varios formatos
+  Serial.println(F("Datos recibidos:"));
+  Serial.print(F("Inicio: ")); Serial.print(dataRecibido.charInit); Serial.print(F(" (Hex: 0x")); Serial.print(dataRecibido.charInit, HEX); Serial.println(F(")"));
+  Serial.print(F("SourceID: ")); Serial.print(dataRecibido.sourceID);  Serial.print(F(" (Hex: 0x")); Serial.print(dataRecibido.sourceID, HEX); Serial.println(F(")"));
+  Serial.print(F("DestinationID: ")); Serial.print(dataRecibido.destinationID); Serial.print(F(" (Hex: 0x")); Serial.print(dataRecibido.destinationID, HEX); Serial.println(F(")"));
+  
+  Serial.print(F("Estado del Maestro: ")); Serial.println(dataRecibido.varMasterLoadConfig ? "true" : "false");
+  Serial.print(F("Estado del Esclavo: ")); Serial.println(dataRecibido.varSlaveLoadConfig ? "true" : "false");
+  Serial.print(F("Estado de Reinicio: ")); Serial.println(dataRecibido.varFlagRestart ? "true" : "false");
+  
+  Serial.println(F("Valores Pines Analogicos: "));
+  Serial.print(F("A0 ")); Serial.print(dataRecibido.varPinA0); 
+  Serial.print(F(", A1 ")); Serial.print(dataRecibido.varPinA1); 
+  Serial.print(F(", A2 ")); Serial.print(dataRecibido.varPinA2); 
+  Serial.print(F(", A3 ")); Serial.print(dataRecibido.varPinA3);
+  Serial.print(F(", A4 ")); Serial.print(dataRecibido.varPinA4); 
+  Serial.print(F(", A5 ")); Serial.print(dataRecibido.varPinA5); 
+  Serial.println(F(". ")); 
+  
+  Serial.println(F("Valores Pines Digitales: "));
+  //Serial.print(F("D0 ")); Serial.print(dataRecibido.varPinD0); 
+  //Serial.print(F(", D1 ")); Serial.print(dataRecibido.varPinD1); 
+  //Serial.print(F(", D2 ")); Serial.print(dataRecibido.varPinD2); 
+  Serial.print(F("D3 ")); Serial.print(dataRecibido.varPinD3); 
+  //Serial.print(F(", D4 ")); Serial.print(dataRecibido.varPind4);
+  Serial.print(F(", D5 ")); Serial.print(dataRecibido.varPinD5); 
+  Serial.print(F(", D6 ")); Serial.print(dataRecibido.varPinD6);
+  Serial.print(F(", D7 ")); Serial.print(dataRecibido.varPinD7); 
+  Serial.print(F(", D8 ")); Serial.print(dataRecibido.varPinD8);
+  Serial.print(F(", D9 ")); Serial.print(dataRecibido.varPinD9);
+  Serial.print(F(", D10 ")); Serial.print(dataRecibido.varPinD10);
+  Serial.print(F(", D11 ")); Serial.print(dataRecibido.varPinD11); 
+  Serial.print(F(", D12 ")); Serial.print(dataRecibido.varPinD12); 
+  Serial.print(F(", D13 ")); Serial.print(dataRecibido.varPinD13); 
+  Serial.println(F(". ")); 
+  
+  Serial.print(F("Tamaño del paquete: ")); Serial.print(dataRecibido.structSize); Serial.print(F(" (Hex: 0x")); Serial.print(dataRecibido.structSize, HEX); Serial.println(F(")"));
+  Serial.print(F("CheckSum del paquete: ")); Serial.print(dataRecibido.checksum); Serial.print(F(" (Hex: 0x")); Serial.print(dataRecibido.checksum, HEX); Serial.println(F(")"));
+  Serial.print(F("CRC del paquete: ")); Serial.print(dataRecibido.crc); Serial.print(F(" (Hex: 0x")); Serial.print(dataRecibido.crc, HEX); Serial.println(F(")"));
+  Serial.print(F("Fin: ")); Serial.print(dataRecibido.charEnd); Serial.print(F(" (Hex: 0x")); Serial.print(dataRecibido.charEnd, HEX); Serial.println(F(")"));
+  Serial.println(F(" "));
+}
+void printVarsInternal() { // Imprime los datos de las variables intenas en varios formatos
+  
+  Serial.println(F("Datos de Variables Independientes Internas:"));
+  Serial.print(F("Inicio: ")); Serial.println(valCharInit);
+  Serial.print(F("Estado del Maestro: ")); Serial.println(master_loadConfig ? "true" : "false");
+  Serial.print(F("Estado del Esclavo: ")); Serial.println(slave_loadConfig ? "true" : "false");
+  Serial.print(F("Estado de Reinicio: ")); Serial.println(flag_restart ? "true" : "false");
+  
+  Serial.println(F("Valores Pines Analogicos: "));
+  Serial.print(F("A0 ")); Serial.print(valPinA0); 
+  Serial.print(F(", A1 ")); Serial.print(valPinA1); 
+  Serial.print(F(", A2 ")); Serial.print(valPinA2); 
+  Serial.print(F(", A3 ")); Serial.print(valPinA3);
+  Serial.print(F(", A4 ")); Serial.print(valPinA4); 
+  Serial.print(F(", A5 ")); Serial.print(valPinA5); 
+  Serial.println(F(". ")); 
+  
+  Serial.println(F("Valores Pines Digitales: "));
+  //Serial.print(F("D0 ")); Serial.print(valPinD0); 
+  //Serial.print(F(", D1 ")); Serial.print(valPinD1); 
+  //Serial.print(F(", D2 ")); Serial.print(valPinD2); 
+  Serial.print(F("D3 ")); Serial.print(valPinD3); 
+  //Serial.print(F(", D4 ")); Serial.print(valPind4);
+  Serial.print(F(", D5 ")); Serial.print(valPinD5); 
+  Serial.print(F(", D6 ")); Serial.print(valPinD6);
+  Serial.print(F(", D7 ")); Serial.print(valPinD7); 
+  Serial.print(F(", D8 ")); Serial.print(valPinD8);
+  Serial.print(F(", D9 ")); Serial.print(valPinD9);
+  Serial.print(F(", D10 ")); Serial.print(valPinD10);
+  Serial.print(F(", D11 ")); Serial.print(valPinD11); 
+  Serial.print(F(", D12 ")); Serial.print(valPinD12); 
+  Serial.print(F(", D13 ")); Serial.print(valPinD13); 
+  Serial.println(F(". ")); 
+  Serial.print(F("Fin: ")); Serial.println(valCharEnd);
+  Serial.println(F(" "));
+
+}
+
+void updateStruct() { // Función para actualizar el struct desde las variables independientes
+
+  // Asigna identificadores de origen, destino y tamaño.
+  dataEnvio.sourceID = mySlaveID; // El remitente es este dispositivo
+  dataEnvio.destinationID = toMasterID; // El destinatario es un Maestro específico
+  // dataEnvio.destinationID = broadcastID; // El destinatario es MultiDifusión)
+
+  dataEnvio.varMasterLoadConfig = master_loadConfig;
+  dataEnvio.varSlaveLoadConfig = slave_loadConfig;
+  dataEnvio.varFlagRestart = flag_restart;
+
+  dataEnvio.varPinA0 = valPinA0;
+  dataEnvio.varPinA1 = valPinA1;
+  dataEnvio.varPinA2 = valPinA2;
+  dataEnvio.varPinA3 = valPinA3;
+  dataEnvio.varPinA4 = valPinA4;
+  dataEnvio.varPinA5 = valPinA5;
+
+  //dataEnvio.varPinD0 = valPinD0;
+  //dataEnvio.varPinD1 = valPinD1;
+  //dataEnvio.varPinD2 = valPinD2;
+  dataEnvio.varPinD3 = valPinD3;
+  //dataEnvio.varPinD4 = valPinD4;
+  dataEnvio.varPinD5 = valPinD5;
+  dataEnvio.varPinD6 = valPinD6;
+  dataEnvio.varPinD7 = valPinD7;
+  dataEnvio.varPinD8 = valPinD8;
+  dataEnvio.varPinD9 = valPinD9;
+  dataEnvio.varPinD10 = valPinD10;
+  dataEnvio.varPinD11 = valPinD11;
+  dataEnvio.varPinD12 = valPinD12;
+  dataEnvio.varPinD13 = valPinD13;
+
+  dataEnvio.structSize = sizeof(dataEnvio); // Actualiza el campo structSize con el tamaño actual del struct
+  calcularChecksum(&dataEnvio); // Calcula y actualiza el checksum
+  calcularCRC(&dataEnvio);      // Calcula y actualiza el CRC
+
+}
+void updateVars() { // Función para actualizar las variables independientes desde el struct recibido
+  
+  master_loadConfig = dataRecibido.varMasterLoadConfig;  
+  slave_loadConfig = dataRecibido.varSlaveLoadConfig;  
+  flag_restart = dataRecibido.varFlagRestart;  
+
+  valPinA0 = dataRecibido.varPinA0;  
+  valPinA1 = dataRecibido.varPinA1;  
+  valPinA2 = dataRecibido.varPinA2;  
+  valPinA3 = dataRecibido.varPinA3;  
+  valPinA4 = dataRecibido.varPinA4;  
+  valPinA5 = dataRecibido.varPinA5;  
+
+  //valPinD0 = dataRecibido.varPinD0;
+  //valPinD1 = dataRecibido.varPinD1;
+  //valPinD2 = dataRecibido.varPinD2;
+  valPinD3 = dataRecibido.varPinD3; 
+  //valPinD4 = dataRecibido.varPinD4;
+  valPinD5 = dataRecibido.varPinD5;
+  valPinD6 = dataRecibido.varPinD6;
+  valPinD7 = dataRecibido.varPinD7;
+  valPinD8 = dataRecibido.varPinD8;
+  valPinD9 = dataRecibido.varPinD9;
+  valPinD10 = dataRecibido.varPinD10;
+  valPinD11 = dataRecibido.varPinD11;
+  valPinD12 = dataRecibido.varPinD12;
+  valPinD13 = dataRecibido.varPinD13;
+
+}
 void rwDataPins(){ // Lee y escribe correspondientemente los pines segun las variables globales
+  
+  //gpio17
   valPinA0 = analogRead(pinA0);
   valPinA1 = analogRead(pinA1);
   valPinA2 = analogRead(pinA2);
@@ -514,140 +744,115 @@ void rwDataPins(){ // Lee y escribe correspondientemente los pines segun las var
   valPinD13 = digitalRead(pinD13);
 
 }
-void infoDataPins() { // Imprime los valores actuales de las variables globales
 
-  Serial.println(F("Estados y Valores Actuales de Variables Compartidas: "));
-  Serial.print("< ");
-  Serial.print(F("Master: ")); Serial.print(master_loadConfig); Serial.print(", ");
-  Serial.print(F("Slave: ")); Serial.print(slave_loadConfig);
-  Serial.println(" >");
+void sendSoftSerial() { // Enviar datos mediante SoftwareSerial
 
-  Serial.println(F("Estados y Valores Actuales de Pines Analogicos: "));
-  Serial.print("< ");
-  Serial.print(F("A0: ")); Serial.print(valPinA0); Serial.print(F(", "));
-  Serial.print(F("A1: ")); Serial.print(valPinA1); Serial.print(F(", "));
-  Serial.print(F("A2: ")); Serial.print(valPinA2); Serial.print(F(", "));
-  Serial.print(F("A3: ")); Serial.print(valPinA3); Serial.print(F(", "));
-  Serial.print(F("A4: ")); Serial.print(valPinA4); Serial.print(F(", "));
-  Serial.print(F("A5: ")); Serial.print(valPinA5);
-  Serial.println(" >");
+  if (millis() >= timeLine0 + 500) { // Comprueba si ha pasado el intervalo de tiempo
 
-  Serial.println(F("Estados y Valores Actuales de Pines Digitales: "));
-  Serial.print("< ");
-  //Serial.print(F("D0: ")); Serial.print(valPinD0); Serial.print(F(", "));
-  //Serial.print(F("D1: ")); Serial.print(valPinD1); Serial.print(F(", "));
-  //Serial.print(F("D2: ")); Serial.print(valPinD2); Serial.print(F(", "));
-  Serial.print(F("D3: ")); Serial.print(valPinD3); Serial.print(F(", "));
-  //Serial.print(F("D4: ")); Serial.print(valPinD4); Serial.print(F(", "));
-  Serial.print(F("D5: ")); Serial.print(valPinD5); Serial.print(F(", "));
-  Serial.print(F("D6: ")); Serial.print(valPinD6); Serial.print(F(", "));
-  Serial.print(F("D7: ")); Serial.print(valPinD7); Serial.print(F(", "));
-  Serial.print(F("D8: ")); Serial.print(valPinD8); Serial.print(F(", "));
-  Serial.print(F("D9: ")); Serial.print(valPinD9); Serial.print(F(", "));
-  Serial.print(F("D10: ")); Serial.print(valPinD10); Serial.print(F(", "));
-  Serial.print(F("D11: ")); Serial.print(valPinD11); Serial.print(F(", "));
-  Serial.print(F("D12: ")); Serial.print(valPinD12); Serial.print(F(", "));
-  Serial.print(F("D13: ")); Serial.print(valPinD13);
-  Serial.println(" >");
+    timeLine0 = millis(); // Actualiza el tiempo de referencia
+
+    digitalWrite(LED_BUILTIN, HIGH); // Enciende el LED para indicar envío
+
+    updateStruct(); // Actualiza el struct con las variables antes de enviar
+
+    softSerial.write(reinterpret_cast<uint8_t*>(&dataEnvio), sizeof(dataEnvio)); // Envía el struct como un bloque de bytes
+
+    printSending(); // Imprime los datos de las variables enviadas
+
+    rwDataPins(); // Lee y escribe correspondientemente los pines segun las variables globales
+
+    digitalWrite(LED_BUILTIN, LOW); // Apaga el LED tras el envío
+
+    commSend++;
+    Serial.print(F("Envio N° : "));
+    Serial.println(commSend);
+    Serial.println(F(" "));
+  }
 }
-void updateDataPins() { // Actualiza los valores de las variables globales segun los datos del Struct dataControl
-    
-  valPinA0 = (controlData.val_pinA0);
-  valPinA1 = (controlData.val_pinA1);
-  valPinA2 = (controlData.val_pinA2);
-  valPinA3 = (controlData.val_pinA3);
-  valPinA4 = (controlData.val_pinA4);
-  valPinA5 = (controlData.val_pinA5);
+void readSoftSerial() { // Leer datos recibidos mediante SoftwareSerial
 
-  //valPinD0 = (controlData.val_pinD0);
-  //valPinD1 = (controlData.val_pinD1);
-  //valPinD2 = (controlData.val_pinD2);
-  valPinD3 = (controlData.val_pinD3);
-  //valPinD4 = (controlData.val_pinD4);
-  valPinD5 = (controlData.val_pinD5);
-  valPinD6 = (controlData.val_pinD6);
-  valPinD7 = (controlData.val_pinD7);
-  valPinD8 = (controlData.val_pinD8);
-  valPinD9 = (controlData.val_pinD9);
-  valPinD10 = (controlData.val_pinD10);
-  valPinD11 = (controlData.val_pinD11);
-  valPinD12 = (controlData.val_pinD12);
-  valPinD13 = (controlData.val_pinD13);
+  if (softSerial.available() >= sizeof(dataRecibido)) { // Comprueba si hay suficientes datos para leer
 
-}
-void readSoftSerial() { // Recibe los datos por Software Serial
-  Serial.println(F("Intentando recibir datos por Software Serial..."));
+    // Lee los bytes del SoftwareSerial al struct
+    softSerial.readBytes(reinterpret_cast<uint8_t*>(&dataRecibido), sizeof(dataRecibido));
 
-  if (softSerial.available() > 0) {  // Verificar si hay datos disponibles
-    char dataChar = (char)softSerial.read();  // Leer el primer byte
+    // Valida el checksum y el CRC
+    uint8_t checksumCalculado;
+    uint16_t crcCalculado;
 
-    if (dataChar == charInit) { // Verificar si el carácter de inicio coincide
-      Serial.println(F("Caracter de inicio reconocido, leyendo..."));
-      
-      timeLine0 = millis();  // Guardar el tiempo de inicio de recepción
+    calcularChecksum(&dataRecibido);
+    calcularCRC(&dataRecibido);
 
-      if (millis() >= timeLine0 + maxTimeWait) { // Esperar los datos dentro del tiempo máximo permitido
-        if (softSerial.available() >= (int)sizeof(controlDataPins)) {  // Verificar si llegaron todos los datos
-          
-          // Leer los datos del struct controlDataPins
-          softSerial.readBytes(reinterpret_cast<char*>(&controlData), sizeof(controlDataPins));
-          Serial.println(F("Datos recibidos por Software Serial:"));
+    checksumCalculado = dataRecibido.checksum; // Checksum ya calculado
+    crcCalculado = dataRecibido.crc;          // CRC ya calculado
 
-          for (size_t i = 0; i < sizeof(controlDataPins); i++) { // Imprimir los datos recibidos
-            Serial.print(reinterpret_cast<char*>(&controlData)[i]); // Opción: imprimir como caracteres ASCII
-            //Serial.print(reinterpret_cast<char*>(&controlData)[i], DEC); // Opción: imprimir en decimal
-            //Serial.print(reinterpret_cast<char*>(&controlData)[i], BIN); // Opción: imprimir en binario
-            //Serial.print(reinterpret_cast<char*>(&controlData)[i], OCT); // Opción: imprimir en octal
-            Serial.print(" ");  // Espacio entre bytes
-          }
-          Serial.println();  // Salto de línea al final
+    if ((dataRecibido.charInit == '<') && // Primera validación: caracteres de control
+        (dataRecibido.charEnd == '>') && // Segunda validación: caracteres de control
+        (dataRecibido.structSize == sizeof(dataRecibido)) && // Tercera validación: comparar tamaño declarado con el tamaño real
+        (dataRecibido.checksum == checksumCalculado) && // Cuarta validación: calcular Checksum
+        (dataRecibido.crc == crcCalculado) &&  // Quinta validación: calcular CRC
+        (dataRecibido.destinationID == mySlaveID || dataRecibido.destinationID == broadcastID)) { // Sexta validación: Verificar el destinatario especifico o multidifusion
 
-          if (softSerial.read() == charEnd) { // Verificar si el carácter de fin coincide
-            Serial.println(F("Carácter de fin reconocido"));
-            return;  // Finalizar si todo está correcto
-          } else {
-            Serial.println(F("Carácter de fin no reconocido"));
-          }
-        }
+      printReceived(); // Imprime los datos de las variables recibidas
+      updateVars(); // Actualiza las variables independientes después de recibir
+      printVarsInternal(); // Imprime los datos de las variables intenas
+      rwDataPins(); // Lee y escribe correspondientemente los pines segun las variables globales
+      commOk++;
+      Serial.print(F("Comunicacion Correcta N° : "));
+      Serial.println(commOk);
+      Serial.println(F(" "));
+    } else { // Manejo de Errores.
+      if (dataRecibido.charInit != '<') { // Error: Caracteres de control inválido
+        Serial.println(F("Error: Caracteres de control inválidos."));
+        Serial.print(F("Caracter Inicio Recibido: ")); Serial.println(dataRecibido.charInit);
+        Serial.print(F("Bytes Recibidos: ")); Serial.println(dataRecibido.structSize);
+        Serial.println(F(" "));
       }
-
-      Serial.println(F("Tiempo de espera agotado"));
-      softSerial.flush();  // Limpiar el buffer si no se completó la recepción
-    } else {
-      Serial.println(F("Carácter de inicio no reconocido"));
+      if (dataRecibido.charEnd != '>') { // Error: Caracteres de control inválido
+        Serial.println(F("Error: Caracteres de control inválidos."));
+        Serial.print(F("Caracter Fin Recibido: ")); Serial.println(dataRecibido.charEnd);
+        Serial.print(F("Bytes Recibidos: ")); Serial.println(dataRecibido.structSize);
+        Serial.println(F(" "));
+      }
+      if (dataRecibido.structSize != sizeof(dataRecibido)) { // Error: Tamaño declarado no coincide con el real
+        Serial.println(F("Error: Tamaño del paquete no coincide con el declarado."));
+        Serial.print(F("Tamaño Real del Struct: ")); Serial.println(sizeof(dataRecibido));
+        Serial.print(F("Tamaño Declarado Recibido: ")); Serial.println(dataRecibido.structSize);
+        Serial.print(F("Bytes Recibidos: ")); Serial.println(dataRecibido.structSize);
+        Serial.println(F(" "));
+      }
+      if (dataRecibido.checksum != checksumCalculado) { // Error: Checksum No Corresponde
+        Serial.println(F("Error: Checksum incorrecto."));
+        Serial.print(F("Checksum Declarado Recibido: ")); Serial.println(dataRecibido.checksum);
+        Serial.print(F("Checksum Calculado: ")); Serial.println(checksumCalculado);
+        Serial.println(F(" "));
+      }
+      if (dataRecibido.crc != crcCalculado) { // Error: CRC No Corresponde
+        Serial.println(F("Error: CRC incorrecto."));
+        Serial.print(F("CRC Declarado Recibido: ")); Serial.println(dataRecibido.crc);
+        Serial.print(F("CRC Calculado: ")); Serial.println(crcCalculado);
+        Serial.println(F(" "));
+      }
+      if (dataRecibido.destinationID != mySlaveID &&
+          dataRecibido.destinationID != toMasterID &&
+          dataRecibido.destinationID != broadcastID &&
+          dataRecibido.destinationID != targetID) { // Error: DispositivoID No Reconocido
+        Serial.println(F("Error: El ID recibido no está en la lista de IDs válidos."));
+        Serial.print(F("ID Recibido: ")); Serial.println(dataRecibido.destinationID);
+        Serial.println(F(" "));
+      }
+      commErr++;
+      Serial.print(F("Comunicacion Erronea N° : "));
+      Serial.println(commErr);
+      Serial.println(F(" "));
     }
-  } else {
-    Serial.println(F("No hay datos disponibles en Software Serial"));
   }
 }
-void sendSoftSerial() { // Envia los datos por Software Serial
-  Serial.println(F("Enviando datos por Software Serial..."));
 
-  softSerial.write(charInit); // Enviar el carácter de inicio
-
-  // Enviar los datos del struct controlDataPins byte por byte
-  softSerial.write(reinterpret_cast<char*>(&controlData), sizeof(controlDataPins));
-  softSerial.write(charEnd); // Enviar el carácter de fin
-
-  Serial.println(F("Datos enviados por Software Serial:"));
-  
-  for (size_t i = 0; i < sizeof(controlDataPins); i++) { // Imprimir los datos enviados para verificación
-    Serial.print(reinterpret_cast<char*>(&controlData)[i]); // Opción: imprimir como caracteres ASCII
-    //Serial.print(reinterpret_cast<char*>(&controlData)[i], DEC); // Opción: imprimir en decimal
-    //Serial.print(reinterpret_cast<char*>(&controlData)[i], BIN); // Opción: imprimir en binario
-    //Serial.print(reinterpret_cast<char*>(&controlData)[i], OCT); // Opción: imprimir en octal
-    Serial.print(" ");  // Espacio entre bytes
-  }
-  Serial.println();  // Salto de línea al final
-}
-void handleSoftSerial(){ // Gestion general del Software Serial
-  readSoftSerial();
-  updateDataPins();
-  rwDataPins();
+void handleSoftSerial() { // Manejo del Software Serial (envío y recepción)
   sendSoftSerial();
-  infoDataPins();
+  readSoftSerial();
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////  
-  
