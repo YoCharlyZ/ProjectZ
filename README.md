@@ -34,6 +34,9 @@ _GRACIAS._
       - [ ] Portar version a otras placas.  
 
   + __Funciona :__    
+    - [x] Archivo de Configuraciones Flexible.  
+    - [x] Sistema de Archivos Externo SdCard.  
+    - [x] Sistema de Archivos Interno.  
     - [x] Comunicacion Software Serial.  
 
   - __No Funciona :__  
@@ -42,7 +45,7 @@ _GRACIAS._
   * __Estado :__  
     - [ ] Stable : (proximamente:)	  
     - [x] Dev : En Desarrollo. :radioactive::biohazard:   
-      - [x] Trabajando Comunicacion Software Serial.  
+      - [x] Trabajando En Muchas Cosas.  
   
 [Autor y Contribuyentes](.github/CONTRIBUTING.md) :coffee:  
   
